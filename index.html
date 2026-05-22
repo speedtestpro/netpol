@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NETPOL // GLOBAL DATABASE</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg-primary:#0b0c10;--bg-secondary:#11141a;--bg-tertiary:#151a21;--bg-card:#1a1f2b;
+  --text-main:#c5c6c7;--text-dim:#7a7c7e;--neon:#66fcf1;--red:#ff3333;
+  --purple:#ff00ff;--orange:#ff9900;--green:#00ff66;--border:#2a2f3a;
+}
+html,body{height:100%;font-family:'JetBrains Mono',Consolas,'Courier New',monospace;background:var(--bg-primary);color:var(--text-main);overflow-x:hidden;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg-secondary);}
+::-webkit-scrollbar-thumb{background:var(--neon);border-radius:3px;}
+
+/* HEADER */
+.header{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;}
+.header-left{display:flex;align-items:center;gap:12px;}
+.logo{font-size:18px;font-weight:700;color:var(--neon);text-shadow:0 0 10px rgba(102,252,241,.4);letter-spacing:2px;}
+.logo span{color:var(--text-dim);font-weight:400;font-size:12px;}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 2s infinite;display:inline-block;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+.header-right{display:flex;align-items:center;gap:12px;}
+.user-badge{display:flex;align-items:center;gap:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:4px;padding:6px 12px;font-size:12px;}
+.user-badge img{width:24px;height:24px;border-radius:50%;border:1px solid var(--neon);}
+.btn{padding:6px 14px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-main);font-family:inherit;font-size:12px;cursor:pointer;border-radius:3px;transition:all .2s;}
+.btn:hover{border-color:var(--neon);color:var(--neon);}
+.btn-neon{border-color:var(--neon);color:var(--neon);}
+.btn-neon:hover{background:rgba(102,252,241,.1);}
+.btn-red{border-color:var(--red);color:var(--red);}
+.btn-red:hover{background:rgba(255,51,51,.1);}
+.btn-orange{border-color:var(--orange);color:var(--orange);}
+.btn-orange:hover{background:rgba(255,153,0,.1);}
+.btn-green{border-color:var(--green);color:var(--green);}
+.btn-green:hover{background:rgba(0,255,102,.1);}
+.btn-purple{border-color:var(--purple);color:var(--purple);}
+.btn-purple:hover{background:rgba(255,0,255,.1);}
+
+/* SYSTEM ALERT */
+#sys-alert{position:fixed;top:-80px;left:50%;transform:translateX(-50%);min-width:320px;max-width:600px;padding:14px 24px;border-radius:0 0 6px 6px;font-size:13px;z-index:9999;transition:top .4s ease;text-align:center;border:1px solid var(--border);border-top:none;}
+#sys-alert.show{top:0;}
+#sys-alert.info{background:var(--bg-secondary);color:var(--neon);border-color:var(--neon);}
+#sys-alert.error{background:#1a0a0a;color:var(--red);border-color:var(--red);}
+#sys-alert.success{background:#0a1a0a;color:var(--green);border-color:var(--green);}
+#sys-alert.warn{background:#1a150a;color:var(--orange);border-color:var(--orange);}
+
+/* STATS PANEL */
+.stats-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:16px 24px;background:var(--bg-primary);}
+.stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;padding:14px 16px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;}
+.stat-card.hunt::before{background:var(--purple);}
+.stat-card.wanted::before{background:var(--orange);}
+.stat-card.prison::before{background:var(--green);}
+.stat-card.deact::before{background:var(--red);}
+.stat-label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text-dim);margin-bottom:6px;}
+.stat-card.hunt .stat-label{color:var(--purple);}
+.stat-card.wanted .stat-label{color:var(--orange);}
+.stat-card.prison .stat-label{color:var(--green);}
+.stat-card.deact .stat-label{color:var(--red);}
+.stat-value{font-size:28px;font-weight:700;}
+.stat-card.hunt .stat-value{color:var(--purple);}
+.stat-card.wanted .stat-value{color:var(--orange);}
+.stat-card.prison .stat-value{color:var(--green);}
+.stat-card.deact .stat-value{color:var(--red);}
+
+/* TABS */
+.tabs-container{padding:0 24px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto;}
+.tab-btn{padding:12px 20px;font-family:inherit;font-size:12px;background:none;border:none;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:1px;}
+.tab-btn:hover{color:var(--text-main);}
+.tab-btn.active{color:var(--neon);border-bottom-color:var(--neon);}
+
+/* MAIN CONTENT */
+.main-content{padding:16px 24px;min-height:calc(100vh - 200px);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{text-align:left;padding:10px 12px;background:var(--bg-tertiary);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .2s;}
+tbody tr:hover{background:rgba(102,252,241,.03);}
+tbody td{padding:10px 12px;vertical-align:middle;}
+.status-badge{padding:3px 10px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;display:inline-block;}
+.status-real-hunt{background:rgba(255,0,255,.15);color:var(--purple);border:1px solid var(--purple);animation:pulse-purple 1.5s infinite;}
+@keyframes pulse-purple{0%,100%{box-shadow:0 0 5px rgba(255,0,255,.3);}50%{box-shadow:0 0 20px rgba(255,0,255,.6);}}
+.status-wanted{background:rgba(255,153,0,.15);color:var(--orange);border:1px solid var(--orange);}
+.status-imprisoned{background:rgba(0,255,102,.15);color:var(--green);border:1px solid var(--green);}
+.status-deactivated{background:rgba(255,51,51,.15);color:var(--red);border:1px solid var(--red);}
+
+/* DETAIL ROW */
+.detail-row td{padding:0!important;background:var(--bg-card);}
+.detail-content{padding:16px 20px;border-left:3px solid var(--neon);margin:0 12px 12px;}
+.detail-content img{max-width:100%;max-height:300px;border:1px solid var(--border);border-radius:4px;margin:8px 0;display:block;}
+.detail-field{margin-bottom:8px;font-size:12px;}
+.detail-field strong{color:var(--neon);margin-right:8px;}
+.arrow{display:inline-block;transition:transform .3s;font-size:10px;color:var(--text-dim);}
+.arrow.open{transform:rotate(90deg);}
+
+/* FORMS */
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 12px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-main);font-family:inherit;font-size:13px;border-radius:3px;outline:none;transition:border-color .2s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--neon);}
+.form-group textarea{min-height:80px;resize:vertical;}
+.form-group select option{background:var(--bg-tertiary);}
+
+/* CISO LOGIN */
+.ciso-lock{text-align:center;padding:60px 20px;}
+.ciso-lock h3{color:var(--neon);margin-bottom:20px;}
+.ciso-lock input{max-width:300px;margin:0 auto;}
+
+/* RULES */
+.rules-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:16px;}
+.rules-section h3{color:var(--neon);margin-bottom:12px;font-size:14px;text-transform:uppercase;letter-spacing:2px;}
+.rules-section p,.rules-section li{font-size:13px;line-height:1.8;color:var(--text-main);}
+.rules-section ul{padding-left:20px;}
+.rules-section li{margin-bottom:4px;}
+.rules-section .rule-num{color:var(--neon);font-weight:700;}
+
+/* COMPLAINT CARD */
+.complaint-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+.complaint-card .info{flex:1;min-width:200px;}
+.complaint-card .info p{font-size:12px;margin-bottom:4px;}
+.complaint-card .info p strong{color:var(--neon);}
+.complaint-card .actions{display:flex;gap:8px;flex-shrink:0;}
+
+/* CHANGE STATUS INLINE */
+.status-select-wrap{display:inline-block;}
+.status-select-wrap select{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-main);font-family:inherit;font-size:11px;padding:3px 6px;border-radius:3px;cursor:pointer;}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:40px;color:var(--text-dim);font-size:13px;}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .header{flex-direction:column;gap:10px;}
+  .stats-panel{grid-template-columns:1fr 1fr;}
+  .main-content{padding:12px;}
+  .tabs-container{padding:0 8px;}
+  .tab-btn{padding:10px 12px;font-size:11px;}
+}
+@media(max-width:480px){
+  .stats-panel{grid-template-columns:1fr;}
+}
+
+/* ======================== LOADING SCREEN ======================== */
+#loader{position:fixed;inset:0;z-index:10000;background:#0b0c10;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:opacity .6s ease, visibility .6s ease;}
+#loader.fade-out{opacity:0;visibility:hidden;}
+#loader-hidden{display:none !important;}
+
+.loader-scanline{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(102,252,241,.03) 2px,rgba(102,252,241,.03) 4px);pointer-events:none;animation:scanmove 8s linear infinite;}
+@keyframes scanmove{0%{background-position:0 0;}100%{background-position:0 200px;}}
+
+.loader-glitch{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--neon),transparent);opacity:.6;animation:glitch-scan 2.5s linear infinite;}
+@keyframes glitch-scan{0%{top:-3px;}100%{top:100%;}}
+
+.loader-content{width:90%;max-width:700px;position:relative;z-index:2;}
+
+.loader-logo{text-align:center;margin-bottom:30px;position:relative;}
+.loader-logo h1{font-size:28px;font-weight:700;color:var(--neon);text-shadow:0 0 20px rgba(102,252,241,.5),0 0 40px rgba(102,252,241,.2);letter-spacing:6px;animation:text-flicker 3s infinite;}
+@keyframes text-flicker{0%,97%,100%{opacity:1;}97.5%{opacity:.4;}98%{opacity:1;}98.5%{opacity:.3;}}
+.loader-logo .sub{font-size:11px;color:var(--text-dim);letter-spacing:4px;margin-top:6px;}
+
+.loader-terminal{background:rgba(17,20,26,.8);border:1px solid var(--border);border-radius:4px;padding:16px 20px;font-size:12px;line-height:1.8;min-height:180px;position:relative;overflow:hidden;}
+.loader-terminal::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(180deg,rgba(102,252,241,.02) 0%,transparent 30%);pointer-events:none;}
+.loader-terminal .t-line{color:var(--neon);opacity:0;transform:translateY(4px);transition:opacity .3s, transform .3s;}
+.loader-terminal .t-line.visible{opacity:1;transform:translateY(0);}
+.loader-terminal .t-line .prefix{color:var(--green);margin-right:8px;}
+.loader-terminal .t-line .warn{color:var(--orange);}
+.loader-terminal .t-line .err{color:var(--red);}
+.loader-terminal .t-line .purple{color:var(--purple);}
+.loader-terminal .t-line .dim{color:var(--text-dim);}
+
+.loader-progress{margin-top:20px;width:100%;}
+.loader-progress-bar{width:100%;height:6px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:3px;overflow:hidden;position:relative;}
+.loader-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--neon),#00ff66);border-radius:3px;transition:width .3s ease;box-shadow:0 0 10px rgba(102,252,241,.4);}
+.loader-progress-text{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-dim);}
+.loader-progress-text .pct{color:var(--neon);font-weight:600;}
+
+.loader-hex{position:absolute;bottom:20px;right:20px;font-size:10px;color:rgba(102,252,241,.15);letter-spacing:2px;pointer-events:none;}
+.loader-corner{position:absolute;width:30px;height:30px;border-color:var(--neon);opacity:.3;}
+.loader-corner.tl{top:10px;left:10px;border-top:2px solid;border-left:2px solid;}
+.loader-corner.tr{top:10px;right:10px;border-top:2px solid;border-right:2px solid;}
+.loader-corner.bl{bottom:10px;left:10px;border-bottom:2px solid;border-left:2px solid;}
+.loader-corner.br{bottom:10px;right:10px;border-bottom:2px solid;border-right:2px solid;}
+
+.loader-cursor{display:inline-block;width:8px;height:14px;background:var(--neon);animation:cursor-blink .6s step-end infinite;vertical-align:middle;margin-left:4px;}
+@keyframes cursor-blink{0%,100%{opacity:1;}50%{opacity:0;}}
+
+.loader-status{text-align:center;margin-top:16px;font-size:11px;color:var(--neon);letter-spacing:2px;animation:status-pulse 1.5s infinite;}
+@keyframes status-pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+</style>
+</head>
+<body>
+
+<!-- ======================== LOADING SCREEN ======================== -->
+<div id="loader">
+  <div class="loader-scanline"></div>
+  <div class="loader-glitch"></div>
+  <div class="loader-corner tl"></div>
+  <div class="loader-corner tr"></div>
+  <div class="loader-corner bl"></div>
+  <div class="loader-corner br"></div>
+  <div class="loader-hex">0x4E4554504F4C</div>
+  <div class="loader-content">
+    <div class="loader-logo">
+      <h1>NETPOL</h1>
+      <div class="sub">// GLOBAL DATABASE v2.0</div>
+    </div>
+    <div class="loader-terminal" id="loader-terminal">
+      <div class="t-line" data-delay="200"><span class="prefix">[SYS]</span>Инициализация ядра безопасности...</div>
+      <div class="t-line" data-delay="500"><span class="prefix">[NET]</span>Подключение к Firebase Realtime Database...</div>
+      <div class="t-line" data-delay="900"><span class="prefix">[DB]</span><span class="dim">Установка WebSocket-канала...</span></div>
+      <div class="t-line" data-delay="1300"><span class="prefix">[SEC]</span>Проверка протоколов шифрования... <span class="warn">TLS 1.3 OK</span></div>
+      <div class="t-line" data-delay="1600"><span class="prefix">[DB]</span>Синхронизация реестра правонарушителей...</div>
+      <div class="t-line" data-delay="2000"><span class="prefix">[SYS]</span>Загрузка модулей: <span class="purple">CISO_PANEL</span>, <span class="warn">COMPLAINTS</span>, <span style="color:var(--green);">ARCHIVE</span></div>
+      <div class="t-line" data-delay="2400"><span class="prefix">[SEC]</span>Валидация токенов доступа... <span style="color:var(--green);">PASS</span></div>
+      <div class="t-line" data-delay="2700"><span class="prefix">[SYS]</span>Рендеринг интерфейса... <span style="color:var(--green);">OK</span></div>
+      <div class="t-line" data-delay="3000"><span class="prefix">[NET]</span>Статус: <span style="color:var(--green);">ONLINE</span> <span class="dim">|</span> Задержка: <span style="color:var(--neon);">12ms</span></div>
+    </div>
+    <div class="loader-progress">
+      <div class="loader-progress-bar">
+        <div class="loader-progress-fill" id="loader-fill"></div>
+      </div>
+      <div class="loader-progress-text">
+        <span id="loader-label">BOOT SEQUENCE</span>
+        <span class="pct" id="loader-pct">0%</span>
+      </div>
+    </div>
+    <div class="loader-status" id="loader-status">░░ ОЖИДАНИЕ АВТОРИЗАЦИИ СИСТЕМЫ ░░</div>
+  </div>
+</div>
+
+<!-- SYSTEM ALERT -->
+<div id="sys-alert"></div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="status-dot"></div>
+    <div class="logo">NETPOL <span>// GLOBAL DATABASE v2.0</span></div>
+  </div>
+  <div class="header-right">
+    <div id="user-area">
+      <button class="btn btn-neon" onclick="loginGoogle()">▶ Войти Google</button>
+      <button class="btn" onclick="loginNickname()">▶ Войти по нику</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATS PANEL -->
+<div class="stats-panel">
+  <div class="stat-card hunt">
+    <div class="stat-label">REAL LIFE HUNT</div>
+    <div class="stat-value" id="stat-hunt">0</div>
+  </div>
+  <div class="stat-card wanted">
+    <div class="stat-label">В РОЗЫСКЕ</div>
+    <div class="stat-value" id="stat-wanted">0</div>
+  </div>
+  <div class="stat-card prison">
+    <div class="stat-label">В ЗАКЛЮЧЕНИИ</div>
+    <div class="stat-value" id="stat-prison">0</div>
+  </div>
+  <div class="stat-card deact">
+    <div class="stat-label">ДЕАКТИВИРОВАНО</div>
+    <div class="stat-value" id="stat-deact">0</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs-container">
+  <button class="tab-btn active" data-tab="registry">РЕЕСТР ПРАВОНАРУШИТЕЛЕЙ</button>
+  <button class="tab-btn" data-tab="archive">АРХИВ ДЕАКТИВИРОВАННЫХ</button>
+  <button class="tab-btn" data-tab="complaint">ПОДАТЬ ЖАЛОБУ</button>
+  <button class="tab-btn" data-tab="rules">УСТАВ И ПРАВА</button>
+  <button class="tab-btn" data-tab="ciso">ПАНЕЛЬ CISO</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+  <!-- TAB 1: REGISTRY -->
+  <div id="tab-registry" class="tab-content active">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:30px;"></th>
+            <th>ID</th>
+            <th>НИКНЕЙМ</th>
+            <th>СТАТУС</th>
+            <th>ЛОКАЦИЯ</th>
+            <th>ДАТА</th>
+          </tr>
+        </thead>
+        <tbody id="registry-body"></tbody>
+      </table>
+      <div id="registry-empty" class="empty-state">[ РЕЕСТР ПУСТ — АКТИВНЫХ ДЕЛ НЕТ ]</div>
+    </div>
+  </div>
+
+  <!-- TAB 2: ARCHIVE -->
+  <div id="tab-archive" class="tab-content">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:30px;"></th>
+            <th>ID</th>
+            <th>НИКНЕЙМ</th>
+            <th>СТАТУС</th>
+            <th>ЛОКАЦИЯ</th>
+            <th>ДАТА</th>
+          </tr>
+        </thead>
+        <tbody id="archive-body"></tbody>
+      </table>
+      <div id="archive-empty" class="empty-state">[ АРХИВ ПУСТ — ДЕАКТИВИРОВАННЫХ ДЕЛ НЕТ ]</div>
+    </div>
+  </div>
+
+  <!-- TAB 3: COMPLAINT -->
+  <div id="tab-complaint" class="tab-content">
+    <div style="max-width:600px;">
+      <h3 style="color:var(--neon);margin-bottom:16px;font-size:14px;letter-spacing:2px;">ПОДАТЬ РАПОРТ / ЖАЛОБУ</h3>
+      <div id="complaint-auth-warning" style="color:var(--red);margin-bottom:16px;font-size:12px;">⚠ Для подачи рапорта необходима авторизация.</div>
+      <div id="complaint-form-wrap" style="display:none;">
+        <div class="form-group">
+          <label>Никнейм цели</label>
+          <input id="c-target" type="text" placeholder="Введите никнейм нарушителя">
+        </div>
+        <div class="form-group">
+          <label>Ссылка на скриншот-доказательство</label>
+          <input id="c-evidence" type="text" placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label>Описание нарушения</label>
+          <textarea id="c-desc" placeholder="Подробно опишите инцидент..."></textarea>
+        </div>
+        <button class="btn btn-orange" onclick="submitComplaint()">⬫ ОТПРАВИТЬ РАПОРТ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: RULES -->
+  <div id="tab-rules" class="tab-content">
+    <div class="rules-section">
+      <h3>§1. УСТАВ NETPOL</h3>
+      <ul>
+        <li><span class="rule-num">1.1</span> Сотрудник обязан соблюдать субординацию и выполнять приказы старших по званию.</li>
+        <li><span class="rule-num">1.2</span> Злоупотребление полномочиями влечёт немедленную деактивацию доступа и понижение.</li>
+        <li><span class="rule-num">1.3</span> Все задержания должны производиться на основании веских доказательств (скриншоты, логи).</li>
+        <li><span class="rule-num">1.4</span> Запрещено разглашать внутреннюю информацию базы данных третьим лицам.</li>
+        <li><span class="rule-num">1.5</span> Использование инструментов REAL LIFE HUNT допускается только с разрешения CISO.</li>
+      </ul>
+    </div>
+    <div class="rules-section">
+      <h3>§2. ПРАВА ЗАДЕРЖАННЫХ</h3>
+      <ul>
+        <li><span class="rule-num">2.1</span> Каждый задержанный имеет право знать причину задержания.</li>
+        <li><span class="rule-num">2.2</span> Задержанный может подать апелляцию через форму рапорта в течение 48 часов.</li>
+        <li><span class="rule-num">2.3</span> Жестокое обращение и превышение мер изоляции запрещены.</li>
+        <li><span class="rule-num">2.4</span> Каждый имеет право на защиту и представителя.</li>
+      </ul>
+    </div>
+    <div class="rules-section">
+      <h3>§3. КОДЕКС БЕЗОПАСНОСТИ</h3>
+      <ul>
+        <li><span class="rule-num">3.1</span> Все операции логируются. Попытка удаления логов = автоматический REAL LIFE HUNT.</li>
+        <li><span class="rule-num">3.2</span> Пароли подлежат смене каждые 30 суток. Многофакторная аутентификация обязательна.</li>
+        <li><span class="rule-num">3.3</span> Передача учётных данных третьим лицам классифицируется как нарушение уровня A.</li>
+        <li><span class="rule-num">3.4</span> Сотрудники, обнаружившие уязвимость, обязаны немедленно доложить CISO.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- TAB 5: CISO PANEL -->
+  <div id="tab-ciso" class="tab-content">
+    <div id="ciso-login" class="ciso-lock">
+      <h3>🔒 АВТОРИЗАЦИЯ CISO</h3>
+      <p style="color:var(--text-dim);margin-bottom:16px;font-size:12px;">Доступ ограничен. Введите пароль.</p>
+      <div class="form-group" style="max-width:300px;margin:0 auto;">
+        <input id="ciso-pass" type="password" placeholder="Пароль..." onkeydown="if(event.key==='Enter')cisoLogin()">
+      </div>
+      <button class="btn btn-neon" style="margin-top:12px;" onclick="cisoLogin()">АВТОРИЗОВАТЬСЯ</button>
+    </div>
+    <div id="ciso-panel" style="display:none;">
+      <!-- CISO SUB-TABS -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn btn-neon ciso-tab-btn active" onclick="showCisoSection('complaints')">ВХОДЯЩИЕ ЖАЛОБЫ</button>
+        <button class="btn ciso-tab-btn" onclick="showCisoSection('newcase')">НОВОЕ ДЕЛО</button>
+        <button class="btn ciso-tab-btn" onclick="showCisoSection('allcases')">ВСЕ ДЕЛА</button>
+      </div>
+
+      <!-- CISO: COMPLAINTS -->
+      <div id="ciso-complaints" class="ciso-section">
+        <h3 style="color:var(--orange);margin-bottom:12px;font-size:13px;">МОДУЛЬ ВХОДЯЩИХ ЖАЛОБ</h3>
+        <div id="ciso-complaints-list"></div>
+        <div id="complaints-empty" class="empty-state">[ ЖАЛОБ НЕТ ]</div>
+      </div>
+
+      <!-- CISO: NEW CASE -->
+      <div id="ciso-newcase" class="ciso-section" style="display:none;">
+        <h3 style="color:var(--neon);margin-bottom:12px;font-size:13px;">ФОРМА ЗАВЕДЕНИЯ УГОЛОВНОГО ДЕЛА</h3>
+        <div style="max-width:600px;">
+          <div class="form-group">
+            <label>Никнейм подозреваемого</label>
+            <input id="nc-nick" type="text" placeholder="Введите никнейм">
+          </div>
+          <div class="form-group">
+            <label>Статус</label>
+            <select id="nc-status">
+              <option value="real-hunt">REAL LIFE HUNT</option>
+              <option value="wanted">В РОЗЫСКЕ</option>
+              <option value="imprisoned">В ЗАКЛЮЧЕНИИ</option>
+              <option value="deactivated">ДЕАКТИВИРОВАН</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Локация обнаружения</label>
+            <input id="nc-location" type="text" placeholder="Город / Сервер / Координаты">
+          </div>
+          <div class="form-group">
+            <label>Ссылка на скриншот улик</label>
+            <input id="nc-evidence" type="text" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label>Метка времени</label>
+            <input id="nc-timestamp" type="text" placeholder="2026-01-01 00:00">
+          </div>
+          <div class="form-group">
+            <label>Срок изоляции</label>
+            <input id="nc-period" type="text" placeholder="30 дней / Пожизненно">
+          </div>
+          <div class="form-group">
+            <label>Описание дела</label>
+            <textarea id="nc-desc" placeholder="Подробное описание правонарушения..."></textarea>
+          </div>
+          <button class="btn btn-neon" onclick="createCase()">⬫ ЗАВЕСТИ ДЕЛО</button>
+        </div>
+      </div>
+
+      <!-- CISO: ALL CASES -->
+      <div id="ciso-allcases" class="ciso-section" style="display:none;">
+        <h3 style="color:var(--red);margin-bottom:12px;font-size:13px;">РЕЕСТР ВСЕХ ДЕЛ (УПРАВЛЕНИЕ)</h3>
+        <div id="ciso-all-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ======================== FIREBASE CONFIG ========================
+const FIREBASE_URL = "https://netpol-3bcf4-default-rtdb.firebaseio.com";
+const firebaseConfig = {
+  apiKey: "AIzaSyDummyKeyForProject",
+  authDomain: "netpol-3bcf4.firebaseapp.com",
+  databaseURL: FIREBASE_URL,
+  projectId: "netpol-3bcf4",
+  storageBucket: "netpol-3bcf4.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:0000000000000000"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+// ======================== STATE ========================
+let currentUser = null;
+let allCases = {};
+let allComplaints = {};
+let openedDetails = new Set();
+let cisoAuthed = false;
+let activeTab = 'registry';
+
+// ======================== CUSTOM ALERT ========================
+function showAlert(msg, type = 'info', duration = 3000) {
+  const el = document.getElementById('sys-alert');
+  el.textContent = msg;
+  el.className = type + ' show';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.classList.remove('show'); }, duration);
+}
+
+// ======================== AUTH ========================
+function loginGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).then(result => {
+    currentUser = {
+      name: result.user.displayName || result.user.email,
+      avatar: result.user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(result.user.displayName || 'U') + '&background=1a1f2b&color=66fcf1'
+    };
+    updateUserUI();
+    showAlert('Авторизация успешна: ' + currentUser.name, 'success');
+  }).catch(err => {
+    showAlert('Google Auth ошибка. Используйте вход по нику.', 'error');
+    console.error(err);
+  });
+}
+
+function loginNickname() {
+  const nick = prompt('Введите ваш никнейм:');
+  if (!nick || !nick.trim()) return;
+  currentUser = {
+    name: nick.trim(),
+    avatar: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(nick.trim()) + '&background=1a1f2b&color=66fcf1'
+  };
+  updateUserUI();
+  showAlert('Вы вошли как: ' + currentUser.name, 'success');
+}
+
+function logout() {
+  currentUser = null;
+  auth.signOut().catch(() => {});
+  updateUserUI();
+  showAlert('Вы вышли из системы.', 'info');
+}
+
+function updateUserUI() {
+  const area = document.getElementById('user-area');
+  const formWrap = document.getElementById('complaint-form-wrap');
+  const authWarn = document.getElementById('complaint-auth-warning');
+  if (currentUser) {
+    area.innerHTML = `
+      <div class="user-badge">
+        <img src="${currentUser.avatar}" alt="avatar">
+        <span>${escHtml(currentUser.name)}</span>
+      </div>
+      <button class="btn btn-red" onclick="logout()">ВЫЙТИ</button>
+    `;
+    if (formWrap) formWrap.style.display = 'block';
+    if (authWarn) authWarn.style.display = 'none';
+  } else {
+    area.innerHTML = `
+      <button class="btn btn-neon" onclick="loginGoogle()">▶ Войти Google</button>
+      <button class="btn" onclick="loginNickname()">▶ Войти по нику</button>
+    `;
+    if (formWrap) formWrap.style.display = 'none';
+    if (authWarn) authWarn.style.display = 'block';
+  }
+}
+
+// ======================== TABS ========================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.getAttribute('data-tab');
+    document.getElementById('tab-' + tab).classList.add('active');
+    activeTab = tab;
+  });
+});
+
+// ======================== CISO PANEL ========================
+function cisoLogin() {
+  const pass = document.getElementById('ciso-pass').value;
+  if (pass === 'CISO_2026') {
+    cisoAuthed = true;
+    document.getElementById('ciso-login').style.display = 'none';
+    document.getElementById('ciso-panel').style.display = 'block';
+    showAlert('CISO: Доступ разрешён.', 'success');
+  } else {
+    showAlert('CISO: Неверный пароль.', 'error');
+  }
+}
+
+function showCisoSection(name) {
+  document.querySelectorAll('.ciso-section').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('.ciso-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('ciso-' + name).style.display = 'block';
+  event.target.classList.add('active');
+  if (name === 'allcases') renderCisoAllCases();
+  if (name === 'complaints') renderCisoComplaints();
+}
+
+// ======================== FIREBASE REALTIME ========================
+function initListeners() {
+  db.ref('cases').on('value', snap => {
+    allCases = snap.val() || {};
+    checkDefaults();
+    updateStats();
+    renderRegistry();
+    renderArchive();
+    if (cisoAuthed) renderCisoAllCases();
+  });
+
+  db.ref('complaints').on('value', snap => {
+    allComplaints = snap.val() || {};
+    renderCisoComplaints();
+  });
+}
+
+function checkDefaults() {
+  const keys = Object.keys(allCases);
+  if (keys.length === 0) {
+    const defaults = {
+      'default-1': {
+        nickname: 'Президент',
+        status: 'real-hunt',
+        location: 'Неизвестно',
+        evidenceUrl: '',
+        timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        isolationPeriod: 'Бессрочно',
+        description: 'Особо опасный преступник. Объявлен в REAL LIFE HUNT. При обнаружении немедленно доложить CISO.'
+      },
+      'default-2': {
+        nickname: 'Ivanspe',
+        status: 'deactivated',
+        location: 'Неизвестно',
+        evidenceUrl: '',
+        timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        isolationPeriod: 'Завершён',
+        description: 'Дело деактивировано. Субъект лишён всех полномочий.'
+      }
+    };
+    db.ref('cases').set(defaults);
+  }
+}
+
+function updateStats() {
+  let hunt = 0, wanted = 0, prison = 0, deact = 0;
+  Object.values(allCases).forEach(c => {
+    if (c.status === 'real-hunt') hunt++;
+    else if (c.status === 'wanted') wanted++;
+    else if (c.status === 'imprisoned') prison++;
+    else if (c.status === 'deactivated') deact++;
+  });
+  document.getElementById('stat-hunt').textContent = hunt;
+  document.getElementById('stat-wanted').textContent = wanted;
+  document.getElementById('stat-prison').textContent = prison;
+  document.getElementById('stat-deact').textContent = deact;
+}
+
+// ======================== RENDER HELPERS ========================
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function statusBadge(status) {
+  const map = {
+    'real-hunt': 'REAL LIFE HUNT',
+    'wanted': 'В РОЗЫСКЕ',
+    'imprisoned': 'В ЗАКЛЮЧЕНИИ',
+    'deactivated': 'ДЕАКТИВИРОВАН'
+  };
+  return `<span class="status-badge status-${status}">${map[status] || status}</span>`;
+}
+
+function generateId() {
+  return 'case-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+}
+
+function renderDetailRow(c, id) {
+  return `<div class="detail-content">
+    ${c.evidenceUrl ? `<div class="detail-field"><strong>УЛИКА-СКРИНШОТ:</strong></div><img src="${escHtml(c.evidenceUrl)}" alt="Evidence" onerror="this.style.display='none'">` : ''}
+    <div class="detail-field"><strong>МЕТКА ОБНАРУЖЕНИЯ:</strong> ${escHtml(c.timestamp || 'Н/Д')}</div>
+    <div class="detail-field"><strong>РЕЖИМ ИЗОЛЯЦИИ:</strong> ${escHtml(c.isolationPeriod || 'Н/Д')}</div>
+    <div class="detail-field"><strong>ОПИСАНИЕ ДЕЛА:</strong> ${escHtml(c.description || 'Нет описания.')}</div>
+    <button class="btn btn-neon" style="margin-top:8px;" onclick="event.stopPropagation();copyToClipboard('${escHtml(c.nickname)}','${escHtml(c.status)}','${escHtml(c.location)}','${escHtml(c.timestamp)}','${escHtml(c.isolationPeriod)}','${escHtml(c.description)}')">⬫ КОПИРОВАТЬ ОРИЕНТИРОВКУ (DISCORD)</button>
+  </div>`;
+}
+
+function renderTable(tbodyId, emptyId, filterFn) {
+  const tbody = document.getElementById(tbodyId);
+  const emptyEl = document.getElementById(emptyId);
+  let html = '';
+  const entries = Object.entries(allCases).filter(([k, v]) => filterFn(v));
+
+  if (entries.length === 0) {
+    tbody.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  entries.forEach(([id, c]) => {
+    const isOpen = openedDetails.has(id);
+    html += `<tr onclick="toggleDetail('${id}')">
+      <td><span class="arrow ${isOpen ? 'open' : ''}">▶</span></td>
+      <td style="color:var(--text-dim);font-size:11px;">${escHtml(id.substring(0, 14))}…</td>
+      <td style="font-weight:600;">${escHtml(c.nickname)}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td>${escHtml(c.location)}</td>
+      <td style="font-size:11px;color:var(--text-dim);">${escHtml(c.timestamp)}</td>
+    </tr>`;
+    html += `<tr class="detail-row" id="detail-${id}" style="display:${isOpen ? 'table-row' : 'none'};">
+      <td colspan="6">${renderDetailRow(c, id)}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function toggleDetail(id) {
+  if (openedDetails.has(id)) {
+    openedDetails.delete(id);
+  } else {
+    openedDetails.add(id);
+  }
+  // Re-render only the affected table
+  renderRegistry();
+  renderArchive();
+}
+
+function renderRegistry() {
+  renderTable('registry-body', 'registry-empty', c => c.status !== 'deactivated');
+}
+
+function renderArchive() {
+  renderTable('archive-body', 'archive-empty', c => c.status === 'deactivated');
+}
+
+// ======================== COPY TO CLIPBOARD ========================
+function copyToClipboard(nick, status, location, timestamp, period, description) {
+  const statusMap = {
+    'real-hunt': '🔴 REAL LIFE HUNT',
+    'wanted': '🟠 В РОЗЫСКЕ',
+    'imprisoned': '🟢 В ЗАКЛЮЧЕНИИ',
+    'deactivated': '⛔ ДЕАКТИВИРОВАН'
+  };
+  const text = `\`\`\`text
+╔══════════════════════════════════════╗
+║   NETPOL // ОРИЕНТИРОВКА   ║
+╠══════════════════════════════════════╣
+║ ЦЕЛЬ:      ${nick}
+║ СТАТУС:    ${statusMap[status] || status}
+║ ЛОКАЦИЯ:   ${location}
+║ МЕТКА:     ${timestamp}
+║ ИЗОЛЯЦИЯ:  ${period}
+╠══════════════════════════════════════╣
+║ ${description}
+╚══════════════════════════════════════╝
+\`\`\``;
+  navigator.clipboard.writeText(text).then(() => {
+    showAlert('Ориентировка скопирована в буфер обмена.', 'success');
+  }).catch(() => {
+    showAlert('Ошибка копирования.', 'error');
+  });
+}
+
+// ======================== COMPLAINTS ========================
+function submitComplaint() {
+  if (!currentUser) {
+    showAlert('Необходима авторизация.', 'error');
+    return;
+  }
+  const target = document.getElementById('c-target').value.trim();
+  const evidence = document.getElementById('c-evidence').value.trim();
+  const desc = document.getElementById('c-desc').value.trim();
+  if (!target || !desc) {
+    showAlert('Заполните обязательные поля: никнейм и описание.', 'error');
+    return;
+  }
+  const id = 'complaint-' + Date.now();
+  db.ref('complaints/' + id).set({
+    target,
+    evidenceUrl: evidence,
+    description: desc,
+    submittedBy: currentUser.name,
+    timestamp: new Date().toISOString().slice(0, 16).replace('T', ' ')
+  }).then(() => {
+    showAlert('Рапорт отправлен на рассмотрение CISO.', 'success');
+    document.getElementById('c-target').value = '';
+    document.getElementById('c-evidence').value = '';
+    document.getElementById('c-desc').value = '';
+  }).catch(err => {
+    showAlert('Ошибка отправки: ' + err.message, 'error');
+  });
+}
+
+function renderCisoComplaints() {
+  const container = document.getElementById('ciso-complaints-list');
+  const emptyEl = document.getElementById('complaints-empty');
+  const entries = Object.entries(allComplaints);
+  if (!container) return;
+
+  if (entries.length === 0) {
+    container.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  let html = '';
+  entries.forEach(([id, c]) => {
+    html += `<div class="complaint-card">
+      <div class="info">
+        <p><strong>ЦЕЛЬ:</strong> ${escHtml(c.target)}</p>
+        <p><strong>ЗАЯВИТЕЛЬ:</strong> ${escHtml(c.submittedBy)}</p>
+        <p><strong>ДАТА:</strong> ${escHtml(c.timestamp)}</p>
+        ${c.evidenceUrl ? `<p><strong>УЛИКА:</strong> <a href="${escHtml(c.evidenceUrl)}" target="_blank" style="color:var(--neon);">${escHtml(c.evidenceUrl)}</a></p>` : ''}
+        <p><strong>ОПИСАНИЕ:</strong> ${escHtml(c.description)}</p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-green" onclick="approveComplaint('${id}')">ОДОБРИТЬ</button>
+        <button class="btn btn-red" onclick="rejectComplaint('${id}')">ОТКЛОНИТЬ</button>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function approveComplaint(id) {
+  const c = allComplaints[id];
+  if (!c) return;
+  // Fill CISO new case form
+  document.getElementById('nc-nick').value = c.target || '';
+  document.getElementById('nc-evidence').value = c.evidenceUrl || '';
+  document.getElementById('nc-desc').value = c.description || '';
+  document.getElementById('nc-timestamp').value = c.timestamp || '';
+  // Switch to new case form
+  document.querySelectorAll('.ciso-section').forEach(s => s.style.display = 'none');
+  document.getElementById('ciso-newcase').style.display = 'block';
+  document.querySelectorAll('.ciso-tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.ciso-tab-btn')[1].classList.add('active');
+  // Delete complaint
+  db.ref('complaints/' + id).remove();
+  showAlert('Жалоба одобрена — данные перенесены в форму.', 'success');
+}
+
+function rejectComplaint(id) {
+  if (!confirm('Отклонить жалобу?')) return;
+  db.ref('complaints/' + id).remove();
+  showAlert('Жалоба отклонена и удалена.', 'warn');
+}
+
+// ======================== CISO: CREATE CASE ========================
+function createCase() {
+  const nickname = document.getElementById('nc-nick').value.trim();
+  const status = document.getElementById('nc-status').value;
+  const location = document.getElementById('nc-location').value.trim();
+  const evidenceUrl = document.getElementById('nc-evidence').value.trim();
+  const timestamp = document.getElementById('nc-timestamp').value.trim();
+  const isolationPeriod = document.getElementById('nc-period').value.trim();
+  const description = document.getElementById('nc-desc').value.trim();
+
+  if (!nickname) {
+    showAlert('Введите никнейм подозреваемого.', 'error');
+    return;
+  }
+
+  const id = generateId();
+  db.ref('cases/' + id).set({
+    nickname,
+    status,
+    location: location || 'Неизвестно',
+    evidenceUrl,
+    timestamp: timestamp || new Date().toISOString().slice(0, 16).replace('T', ' '),
+    isolationPeriod: isolationPeriod || 'Не указан',
+    description: description || 'Нет описания.'
+  }).then(() => {
+    showAlert('Дело заведено: ' + id, 'success');
+    document.getElementById('nc-nick').value = '';
+    document.getElementById('nc-location').value = '';
+    document.getElementById('nc-evidence').value = '';
+    document.getElementById('nc-timestamp').value = '';
+    document.getElementById('nc-period').value = '';
+    document.getElementById('nc-desc').value = '';
+  }).catch(err => {
+    showAlert('Ошибка: ' + err.message, 'error');
+  });
+}
+
+// ======================== CISO: ALL CASES ========================
+function renderCisoAllCases() {
+  const container = document.getElementById('ciso-all-list');
+  if (!container) return;
+  const entries = Object.entries(allCases);
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="empty-state">[ ДЕЛ НЕТ ]</div>';
+    return;
+  }
+  let html = '<div class="table-wrap"><table style="font-size:12px;"><thead><tr><th>ID</th><th>НИКНЕЙМ</th><th>СТАТУС</th><th>ЛОКАЦИЯ</th><th>ДЕЙСТВИЯ</th></tr></thead><tbody>';
+  entries.forEach(([id, c]) => {
+    html += `<tr style="border-bottom:1px solid var(--border);">
+      <td style="font-size:10px;color:var(--text-dim);">${escHtml(id.substring(0, 14))}…</td>
+      <td style="font-weight:600;">${escHtml(c.nickname)}</td>
+      <td>
+        <div class="status-select-wrap">
+          <select onchange="changeCaseStatus('${id}', this.value)">
+            <option value="real-hunt" ${c.status==='real-hunt'?'selected':''}>REAL LIFE HUNT</option>
+            <option value="wanted" ${c.status==='wanted'?'selected':''}>В РОЗЫСКЕ</option>
+            <option value="imprisoned" ${c.status==='imprisoned'?'selected':''}>В ЗАКЛЮЧЕНИИ</option>
+            <option value="deactivated" ${c.status==='deactivated'?'selected':''}>ДЕАКТИВИРОВАН</option>
+          </select>
+        </div>
+      </td>
+      <td>${escHtml(c.location)}</td>
+      <td><button class="btn btn-red" style="padding:3px 10px;font-size:11px;" onclick="deleteCase('${id}')">УДАЛИТЬ</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+function changeCaseStatus(id, newStatus) {
+  db.ref('cases/' + id + '/status').set(newStatus).then(() => {
+    showAlert('Статус обновлён: ' + newStatus, 'success');
+    if (cisoAuthed) renderCisoAllCases();
+  }).catch(err => {
+    showAlert('Ошибка: ' + err.message, 'error');
+  });
+}
+
+function deleteCase(id) {
+  if (!confirm('Безвозвратно удалить дело ' + id + '?')) return;
+  db.ref('cases/' + id).remove().then(() => {
+    showAlert('Дело удалено.', 'warn');
+  }).catch(err => {
+    showAlert('Ошибка: ' + err.message, 'error');
+  });
+}
+
+// ======================== LOADING SCREEN ========================
+function runBootSequence() {
+  const loader = document.getElementById('loader');
+  const fill = document.getElementById('loader-fill');
+  const pctEl = document.getElementById('loader-pct');
+  const labelEl = document.getElementById('loader-label');
+  const statusEl = document.getElementById('loader-status');
+  const lines = document.querySelectorAll('.t-line');
+
+  let progress = 0;
+  const totalDuration = 3400;
+  const startTime = Date.now();
+
+  // Animate terminal lines
+  lines.forEach(line => {
+    const delay = parseInt(line.getAttribute('data-delay')) || 0;
+    setTimeout(() => {
+      line.classList.add('visible');
+    }, delay);
+  });
+
+  // Smooth progress bar animation
+  function updateProgress() {
+    const elapsed = Date.now() - startTime;
+    progress = Math.min((elapsed / totalDuration) * 100, 100);
+    fill.style.width = progress + '%';
+    pctEl.textContent = Math.floor(progress) + '%';
+
+    if (progress < 30) {
+      labelEl.textContent = 'BOOT SEQUENCE';
+    } else if (progress < 60) {
+      labelEl.textContent = 'CONNECTING TO DATABASE';
+    } else if (progress < 85) {
+      labelEl.textContent = 'SYNCING RECORDS';
+    } else {
+      labelEl.textContent = 'SYSTEM READY';
+    }
+
+    if (progress < 100) {
+      requestAnimationFrame(updateProgress);
+    }
+  }
+  requestAnimationFrame(updateProgress);
+
+  // Finalize
+  setTimeout(() => {
+    statusEl.textContent = '▓▓ СИСТЕМА АКТИВИРОВАНА ▓▓';
+    statusEl.style.color = 'var(--green)';
+    statusEl.style.animation = 'none';
+  }, totalDuration - 400);
+
+  setTimeout(() => {
+    loader.classList.add('fade-out');
+    setTimeout(() => {
+      loader.classList.add('loader-hidden');
+    }, 600);
+  }, totalDuration + 200);
+}
+
+// ======================== INIT ========================
+document.addEventListener('DOMContentLoaded', () => {
+  runBootSequence();
+});
+initListeners();
+updateUserUI();
+</script>
+</body>
+</html>
